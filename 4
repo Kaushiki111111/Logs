@@ -1,0 +1,49 @@
+import os
+
+def create_config(split, output_dir, src_graphs, target_platform=None, platform_gen=None, soc_id=58, dsp_arch="v79"):
+    # Import NspTargets from the current build environment
+    from common.utilities.nsptargets import NspTargets
+    
+    # If target platform and gen are provided, get the appropriate configuration
+    if target_platform and platform_gen:
+        try:
+            nsp_tar = eval(f"NspTargets.{target_platform}.GEN{platform_gen}")
+            soc_id = nsp_tar.soc_id
+            dsp_arch = nsp_tar.dsp_arch
+        except:
+            print(f"Warning: {target_platform}.GEN{platform_gen} not found in NspTargets")
+    
+    # Initialize context dictionary
+    context_dict = {
+        "weight_sharing_enabled": len(src_graphs)
+    }
+    
+    # Check environment variable for EXTENDED_UDMA
+    extended_udma_env = os.environ.get('EXTENDED_UDMA')
+    
+    # Add extended_udma flag based on environment variable or DSP architecture
+    if extended_udma_env is not None:
+        # Use the environment variable if it exists
+        if extended_udma_env.lower() in ('1', 'true', 'yes', 'on'):
+            context_dict["extended_udma"] = True
+        elif extended_udma_env.lower() in ('0', 'false', 'no', 'off'):
+            context_dict["extended_udma"] = False
+    elif dsp_arch == "v81":
+        # Default to True for v81 if no environment variable is set
+        context_dict["extended_udma"] = True
+    
+    perf_config = {
+        "graph": {
+            "vtcm_mb": 8,
+            "graph_names": src_graphs,
+        },
+        "devices": [
+            {
+                "soc_id": int(soc_id),
+                "dsp_arch": dsp_arch,
+            }
+        ],
+        "context": context_dict
+    }
+    
+    return perf_config
