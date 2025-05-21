@@ -1,0 +1,73 @@
+1: Create a wrapper that selects the correct implementation
+
+def create_config(split, output_dir, src_graphs, target_platform=None, platform_gen=None, soc_id=58, dsp_arch="v79"):
+    """
+    Create configuration based on the specified architecture.
+    For v81, this function will delegate to create_pt_config if available.
+    """
+    if dsp_arch == "v81":
+        try:
+            # Try to import the PT version and use it
+            return create_pt_config(split, output_dir, src_graphs, target_platform, platform_gen, soc_id, dsp_arch)
+        except ImportError:
+            print("Warning: v81 requested but src_pt not available, using regular config without extended_udma")
+            # Fall back to regular config without extended_udma
+    
+    # For all other cases, use the regular configuration
+    # If target platform and gen are provided, get the appropriate configuration
+    if target_platform and platform_gen:
+        from common.utilities.nsptargets import NspTargets
+        nsp_tar = eval(f"NspTargets.{target_platform}.GEN{platform_gen}")
+        soc_id = nsp_tar.soc_id
+        dsp_arch = nsp_tar.dsp_arch
+    
+    perf_config = {
+        "graph": {
+            "vtcm_mb": 8,
+            "graph_names": src_graphs,
+        },
+        "devices": [
+            {
+                "soc_id": int(soc_id),
+                "dsp_arch": dsp_arch,
+            }
+        ],
+        "context": {
+            "weight_sharing_enabled": len(src_graphs)
+        }
+    }
+    
+    return perf_config
+
+def create_pt_config(split, output_dir, src_graphs, target_platform=None, platform_gen=None, soc_id=81, dsp_arch="v81"):
+    """
+    Create configuration specifically for the PT build with v81 support.
+    This function should only be called in the PT build environment.
+    """
+    # Import the PT version of NspTargets
+    from src_pt.common.utilities.nsptargets import NspTargets as PtNspTargets
+    
+    # If target platform and gen are provided, get the appropriate configuration
+    if target_platform and platform_gen:
+        nsp_tar = eval(f"PtNspTargets.{target_platform}.GEN{platform_gen}")
+        soc_id = nsp_tar.soc_id
+        dsp_arch = nsp_tar.dsp_arch
+    
+    perf_config = {
+        "graph": {
+            "vtcm_mb": 8,
+            "graph_names": src_graphs,
+        },
+        "devices": [
+            {
+                "soc_id": int(soc_id),
+                "dsp_arch": dsp_arch,
+            }
+        ],
+        "context": {
+            "extended_udma": True,  # Enable extended_udma for v81
+            "weight_sharing_enabled": len(src_graphs)
+        }
+    }
+    
+    return perf_config
