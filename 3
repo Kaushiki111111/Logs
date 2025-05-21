@@ -1,0 +1,40 @@
+ Just check the dsp_arch parameter
+If you know which build environment you're in when you call the function, the simplest approach is:
+
+def create_config(split, output_dir, src_graphs, target_platform=None, platform_gen=None, soc_id=58, dsp_arch="v79"):
+    # Import NspTargets from the current build environment
+    from common.utilities.nsptargets import NspTargets
+    
+    # If target platform and gen are provided, get the appropriate configuration
+    if target_platform and platform_gen:
+        try:
+            nsp_tar = eval(f"NspTargets.{target_platform}.GEN{platform_gen}")
+            soc_id = nsp_tar.soc_id
+            dsp_arch = nsp_tar.dsp_arch
+        except:
+            print(f"Warning: {target_platform}.GEN{platform_gen} not found in NspTargets")
+    
+    # Initialize context dictionary
+    context_dict = {
+        "weight_sharing_enabled": len(src_graphs)
+    }
+    
+    # Add extended_udma flag only for v81 architecture
+    if dsp_arch == "v81":
+        context_dict["extended_udma"] = True
+    
+    perf_config = {
+        "graph": {
+            "vtcm_mb": 8,
+            "graph_names": src_graphs,
+        },
+        "devices": [
+            {
+                "soc_id": int(soc_id),
+                "dsp_arch": dsp_arch,
+            }
+        ],
+        "context": context_dict
+    }
+    
+    return perf_config
