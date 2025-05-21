@@ -1,0 +1,81 @@
+Option 2: Create a custom version of NspTargets with v81 support
+You could create your own version of NspTargets in a separate file (e.g., extended_nsptargets.py) that includes both v79 and v81 support:
+
+# extended_nsptargets.py
+from enum import Enum, auto
+from common.utilities.nsptargets import NspTargets as BaseNspTargets
+from common.utilities.nsptargets import _Target
+
+class _ExtendedAndroid(_Target):
+    GEN1 = auto()
+    GEN2 = auto()
+    GEN3 = auto()
+    GEN4 = auto()
+    GEN5 = auto()  # Added for v81
+    
+    _soc_ids = {
+        GEN1: 45,
+        GEN2: 46,
+        GEN3: 47,
+        GEN4: 48,
+        GEN5: 81,  # Added for v81
+    }
+    
+    _dsp_archs = {
+        GEN1: "v69",
+        GEN2: "v73",
+        GEN3: "v75",
+        GEN4: "v79",
+        GEN5: "v81",  # Added for v81
+    }
+
+class ExtendedNspTargets:
+    Android = _ExtendedAndroid
+
+
+#then use 
+def create_config(split, output_dir, src_graphs, target_platform=None, platform_gen=None, soc_id=58, dsp_arch="v79"):
+    # Try to import the extended NspTargets first, fall back to regular if not available
+    try:
+        from extended_nsptargets import ExtendedNspTargets as NspTargets
+        HAS_V81_SUPPORT = True
+    except ImportError:
+        from common.utilities.nsptargets import NspTargets
+        HAS_V81_SUPPORT = False
+    
+    # If target platform and gen are provided, get the appropriate configuration
+    if target_platform and platform_gen:
+        try:
+            nsp_tar = eval(f"NspTargets.{target_platform}.GEN{platform_gen}")
+            soc_id = nsp_tar.soc_id
+            dsp_arch = nsp_tar.dsp_arch
+        except:
+            print(f"Warning: {target_platform}.GEN{platform_gen} not found in NspTargets")
+    
+    # Initialize context dictionary
+    context_dict = {
+        "weight_sharing_enabled": len(src_graphs)
+    }
+    
+    # Add extended_udma flag for v81 architecture
+    if dsp_arch == "v81":
+        if HAS_V81_SUPPORT:
+            context_dict["extended_udma"] = True
+        else:
+            print("Warning: v81 requested but not supported in this build environment")
+    
+    perf_config = {
+        "graph": {
+            "vtcm_mb": 8,
+            "graph_names": src_graphs,
+        },
+        "devices": [
+            {
+                "soc_id": int(soc_id),
+                "dsp_arch": dsp_arch,
+            }
+        ],
+        "context": context_dict
+    }
+    
+    return perf_config
